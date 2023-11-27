@@ -16,7 +16,30 @@ This is code to take the 'phototranssummarysd' data from MARINe and calculate co
 
 ```{r import_data}
 #read in data
-phototransummarysd_download <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/large_data/phototransummarysd_download.csv")
+phototran_df <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/large_data/phototransummarysd_download.csv")
+
+```
+
+```{r filter}
+library(dplyr)
+#retain only columns of interest
+trans_filt<-phototran_df[,c(3,4,5,9,10,15,16,17,18,25)]
+
+#sort by spp per site for each year
+trans_by_species<- trans_filt %>% group_by(species_code, marine_common_year, site_code, site_lat)
+
+#get avg % cover per spp per site per year
+cov_per_yr<-trans_by_species %>% summarise(
+    cov = mean(average_percent_cover)
+)
+
+#only keep rows with per cov greater than zero
+cov_per_yr_filt<-cov_per_yr[(cov_per_yr[,5]>0),]
+
+
+#get min/max lat per year each spp is found at
+spp.min.lat<-cov_per_yr_filt %>% group_by(species_code, marine_common_year) %>%
+         slice(which.min(site_lat))
 
 ```
 
