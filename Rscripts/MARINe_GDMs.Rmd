@@ -9,14 +9,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## This markdown is for the processing of MARINe long-term monitoring data for Generalized Dissimilarity Models (GDMs)
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+First to note that the photo tran data was too large to host on github so we have to open this from a local directory.
 
 ```{r cars}
-summary(cars)
+phototransummarysd_download <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/large_data/phototransummarysd_download.csv")
+
 ```
 
 ## Including Plots
