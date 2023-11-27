@@ -1,0 +1,31 @@
+---
+title: "MARINe_CTI"
+author: "Erica Nielsen"
+date: "2023-11-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is code to take the 'phototranssummarysd' data from MARINe and calculate community temperature index (CTI) per site per year, and run statistical models to look at influence of environment on CTI change.
+
+
+```{r import_data}
+#read in data
+phototransummarysd_download <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/large_data/phototransummarysd_download.csv")
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
