@@ -18,6 +18,10 @@ This is code to take the 'phototranssummarysd' data from MARINe and calculate co
 #read in data
 phototran_df <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/large_data/phototransummarysd_download.csv")
 
+#filter to only CA sites (can extend in future if we want)
+
+
+
 ```
 
 ```{r filter}
@@ -38,8 +42,31 @@ cov_per_yr_filt<-cov_per_yr[(cov_per_yr[,5]>0),]
 
 
 #get min/max lat per year each spp is found at
-spp.min.lat<-cov_per_yr_filt %>% group_by(species_code, marine_common_year) %>%
-         slice(which.min(site_lat))
+spp.min.max.lat<-cov_per_yr_filt %>% group_by(species_code, marine_common_year) %>%
+        summarise(max_lat = max(site_lat), min_lat = min(site_lat))
+
+```
+
+```{r check temp}
+
+#now we will check to see if MARINe temp data is avaiable for all sites
+temp_means <- read.csv("C:/Users/erica.nielsen/Desktop/Synz/MARINe/PCI_MARINe_synth/data/MARINe_daily_temperature_means_UTC.csv")
+
+matched <- intersect(cov_per_yr_filt$site_code, temp_means$marine_site_code)
+all <-  union(cov_per_yr_filt$site_code, temp_means$marine_site_code)
+non.matched <- all[!all %in% matched]
+
+## There's 51 sites that are not in the temp data
+
+# let's just see if we try to extract temp per year per lat what will happen...
+
+#first remove unneccessary columns from temp data
+temp_filt<-temp_means[,c(2,4,11,18)]
+
+#take mean temp per year
+temp_mean_yr<-temp_filt %>% group_by(marine_site_code, year) %>%
+        summarise(temp = mean(mean))
+# the above DF shows that many sites don't have temp data going back all years... might want to use something more consistent
 
 ```
 
