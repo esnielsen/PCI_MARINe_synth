@@ -2,7 +2,10 @@
 title: "MARINe_GDM"
 author: "Erica Nielsen"
 date: "2023-12-19"
-output: github_document
+output:
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This markdown takes biodiversity data from MARINe rocky shore long term monitoring & satellite environmental data to run GDMs to map community structure for the present dat & 2050. 
 
-```{r Read biodiversity data}
+```{r Read biodiversity data, warning=FALSE}
 library(readxl)
 
 #read point contact
@@ -36,7 +39,7 @@ The input data to make 'site-pair' tables for GDMs -> Rows = sites, Columns = sp
   - we are just comparing sites, so if %cov and density 
 
 
-```{r check spp per table}
+```{r check spp per table, warning=FALSE}
 
 #see if there's overlapping spp between three tables 
 intersect(intersect(pt_cont$species_lump, quad$species_lump), swath$species_lump)
@@ -60,7 +63,7 @@ The next problem is that we need one 'spp_abund' count for the present day and w
 
 
 
-```{r filter years & check # years sampled, echo=FALSE}
+```{r filter_years, message=FALSE, warning=FALSE}
 
 
 library(dplyr)
@@ -114,7 +117,7 @@ ggplot(yrs_pt_cont, aes(x=latitude, y=num_years)) + geom_point()
 - What I could also do is not filter the data to 2000-2014, then apply 3+ year filter and see if outputs differ (only thing then is that the climate data misses 2015-2023)
 
 
-```{r get avg abund, echo=FALSE}
+```{r get avg abund, warning=FALSE, message=FALSE}
 ## Starting with no number of yrs filter
 
 #average abundance per species over the years per site
@@ -141,7 +144,7 @@ So now we have a 'x-y species list' dataframe (which is bioFormat=2 for GDM, i.e
 
 Last step before we can make a 'site-pair' table is to get the environmental predictor variables
 
-```{r get ocean vars}
+```{r get ocean vars, warning=FALSE}
 library(sdmpredictors)
 
 

@@ -63,24 +63,65 @@ exist for all biodiv sites so will need to use other data)
 
 - Bio-Oracle version 2 = 2000-2014
 
-<!-- -->
+``` r
+library(dplyr)
+library(ggplot2)
 
-    ## Warning: package 'dplyr' was built under R version 4.3.2
+#filter by year per DF
 
-    ## 
-    ## Attaching package: 'dplyr'
+quad_yr<-quad%>% filter(between(year, 2000, 2014))
+swath_yr<-swath%>% filter(between(year, 2000, 2014))
+pt_cont_yr<-pt_cont%>% filter(between(year, 2000, 2014))
 
-    ## The following objects are masked from 'package:stats':
-    ## 
-    ##     filter, lag
+#now see how many years each site was sampled for
+  # think I might want to filter to include only sites with 3+ years... or run analyses on all data vs. filtered data
 
-    ## The following objects are masked from 'package:base':
-    ## 
-    ##     intersect, setdiff, setequal, union
+## QUAD
+yrs_quad<-quad_yr %>% group_by(marine_site_name,latitude) %>% count(year, sort = TRUE)
 
-    ## Warning: package 'ggplot2' was built under R version 4.3.2
+yrs_quad<-yrs_quad %>%
+    group_by(marine_site_name) %>%
+    add_count(name = "num_years")
 
-![](MARINe_GDM_files/figure-gfm/filter%20years%20&%20check%20#%20years%20sampled-1.png)<!-- -->![](MARINe_GDM_files/figure-gfm/filter%20years%20&%20check%20#%20years%20sampled-2.png)<!-- -->![](MARINe_GDM_files/figure-gfm/filter%20years%20&%20check%20#%20years%20sampled-3.png)<!-- -->
+ggplot(yrs_quad, aes(x=latitude, y=num_years)) + geom_point()
+```
+
+![](MARINe_GDM_files/figure-gfm/filter_years-1.png)<!-- -->
+
+``` r
+#a lot of the northern sites only have 1 year collected for quad
+
+
+## SWATH
+yrs_swath<-swath_yr %>% group_by(marine_site_name,latitude) %>% count(year, sort = TRUE)
+
+yrs_swath<-yrs_swath %>%
+    group_by(marine_site_name) %>%
+    add_count(name = "num_years")
+
+ggplot(yrs_swath, aes(x=latitude, y=num_years)) + geom_point()
+```
+
+![](MARINe_GDM_files/figure-gfm/filter_years-2.png)<!-- -->
+
+``` r
+# similar pattern in swath
+
+## PT Cont
+yrs_pt_cont<-pt_cont_yr %>% group_by(marine_site_name,latitude) %>% count(year, sort = TRUE)
+
+yrs_pt_cont<-yrs_pt_cont %>%
+    group_by(marine_site_name) %>%
+    add_count(name = "num_years")
+
+ggplot(yrs_pt_cont, aes(x=latitude, y=num_years)) + geom_point()
+```
+
+![](MARINe_GDM_files/figure-gfm/filter_years-3.png)<!-- -->
+
+``` r
+#even fewer years for the pt_cont data
+```
 
 -Looks like doing \>3 years per site would yield very low sample sizes…
 think that we can try comparing 1 vs. 2 years sampling and see if
@@ -90,14 +131,27 @@ there’s difference
   3+ year filter and see if outputs differ (only thing then is that the
   climate data misses 2015-2023)
 
-<!-- -->
+``` r
+## Starting with no number of yrs filter
 
-    ## `summarise()` has grouped output by 'marine_site_name', 'latitude',
-    ## 'longitude'. You can override using the `.groups` argument.
-    ## `summarise()` has grouped output by 'marine_site_name', 'latitude',
-    ## 'longitude'. You can override using the `.groups` argument.
-    ## `summarise()` has grouped output by 'marine_site_name', 'latitude',
-    ## 'longitude'. You can override using the `.groups` argument.
+#average abundance per species over the years per site
+quad_avg <- quad_yr %>%
+     group_by(marine_site_name, latitude, longitude, species_lump) %>%
+     summarize(Mean = mean(density_per_m2, na.rm=FALSE))
+
+pt_cont_avg <- pt_cont_yr %>%
+     group_by(marine_site_name, latitude, longitude, species_lump) %>%
+     summarize(Mean = mean(percent_cover, na.rm=FALSE))
+
+swath_avg <- swath_yr %>%
+     group_by(marine_site_name, latitude, longitude, species_lump) %>%
+     summarize(Mean = mean(density_per_m2, na.rm=FALSE))
+
+#join data frames
+common_col_names <- intersect(names(quad_avg), names(pt_cont_avg)) #get column names
+quad_pt<-merge(quad_avg, pt_cont_avg, by=common_col_names, all.x=TRUE, all.y=TRUE) #merge first 2 DFs
+quad_pt_swath<-merge(quad_pt, swath_avg, by=common_col_names, all.x=TRUE, all.y=TRUE) #merge in swath
+```
 
 So now we have a ‘x-y species list’ dataframe (which is bioFormat=2 for
 GDM, i.e. spp are rows and not columns)
@@ -108,5 +162,3 @@ environmental predictor variables
 ``` r
 library(sdmpredictors)
 ```
-
-    ## Warning: package 'sdmpredictors' was built under R version 4.3.2
