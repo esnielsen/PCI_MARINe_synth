@@ -2,7 +2,7 @@
 title: "MARINe_GDM"
 author: "Erica Nielsen"
 date: "2023-12-19"
-output: rmarkdown::github_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
