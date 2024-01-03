@@ -57,6 +57,7 @@ The next problem is that we need one 'spp_abund' count for the present day and w
         download here: https://disc.gsfc.nasa.gov/datasets?page=1&source=AQUA%20AIRS,AQUA%20AMSU-A,AQUA%20HSB
             date range=2002-09-01 to 2014-09-01
             spatial range= xmin= -126, xmax= -116, ymin = 32, ymax= 42
+            probs want surfAir_A and _D and get average across those (A=daytime, D=nighttime)
 
 
 - Bio-Oracle version 2 = 2000-2014 
@@ -146,12 +147,158 @@ Last step before we can make a 'site-pair' table is to get the environmental pre
 
 ```{r get ocean vars, warning=FALSE}
 library(sdmpredictors)
+library(raster)
+library(psych)
 
+#view available layers
+marine_lyrs<- list_layers(datasets=c(), terrestrial = F, marine = T, freshwater =
+  F, monthly = TRUE, version = NULL)
+
+#download marine features
+mar.env.pres <- load_layers( layercodes = c("BO22_tempmean_ss", "BO22_salinitymean_ss", "BO22_curvelmean_ss") , datadir = 'C:/Users/erica.nielsen/Desktop/Synz/MARINe/PCI_MARINe_synth/GDM', equalarea=FALSE, rasterstack=TRUE)
+
+#investigate which layers are available for future
+mar.env.fut <-list_layers_future(datasets = c(), scenario = NA, year = NA,
+  terrestrial = F, marine = T, freshwater = F, monthly = TRUE, version =
+  NULL)
+# we have SST, SSS, current velocity for 2050 & 2100 
+
+#Crop layers to US West Coast extent
+WC.ext <- extent(-126, -116, 32, 43)
+mar.env.pres.c <- crop(mar.env.pres, WC.ext)
+
+## Check extent
+#get long and lat
+lat_longs<- unique(quad_pt_swath[,c(3,2)])
+
+plot(mar.env.pres.c$BO22_tempmean_ss)
+
+points(lat_longs[,1:2], pch=19, col="red")
+  
+  
+mar.env.pres.c <- stack(mar.env.pres.c)
+
+#Extract values when there's NAs (sometimes coastal points won't align with ocean or air raster layers, so we extract nearest possible point from raster)
+sample_raster_NA <- function(r, xy){
+  apply(X = xy, MARGIN = 1, 
+        FUN = function(xy) r@data@values[which.min(replace(distanceFromPoints(r, xy), is.na(r), NA))])
+  
+}
+
+test<-lapply(mar.env.pres.c@layers, function(a_layer) sample_raster_NA(a_layer, cbind(lat_longs$longitude, lat_longs$latitude)))
+
+envdat.whole <-as.data.frame(do.call(cbind, test))
+env.data.pres <- cbind2(x=lat_longs, y=envdat.whole)
+
+#Get env var correlations (want to exclude any of those >0.7)
+pairs.panels(envdat.whole, scale=T)
+
+```
+
+
+Okay now we have mean sea surface temp, salinity, and current velocity for site coords. Now we need to combine with species table and convert to site-pair table for GDM
+
+```{r make_site_pair, warning=FALSE, message=FALSE}
+
+library(gdm)
+
+xy_col_names <- intersect(names(quad_pt_swath), names(env.data.pres)) #get column names
+
+GDM_spp_env <-merge(quad_pt_swath, env.data.pres, by=, all.x=TRUE, all.y=TRUE) #merge spp and env data matching my lat long
+
+#going to do a bit or re-naming now... will sites and spp will get codes, so will have to back to GDM_spp_env metadata
+GDM_spp_env <- GDM_spp_env %>% group_by(marine_site_name) %>% mutate(site=cur_group_id())
+
+GDM_spp_env <- GDM_spp_env %>% group_by(species_lump) %>% mutate(species=cur_group_id())
+
+GDM_spp_env$species = paste0('spp', GDM_spp_env$species)
+
+GDM_sppTab <- GDM_spp_env[, c(1,2,5,9,10)]
+
+GDM_sppTab$species <- as.factor(GDM_sppTab$species)
+
+# Env data need to be separate DF.. (needs to also have sites, lat & long) 
+GDM_envTab <- GDM_spp_env[, c(9,1,2,6:8)]
+#add env col names
+names(GDM_envTab)[4] <- "SST"
+names(GDM_envTab)[5] <- "SSS"
+names(GDM_envTab)[6] <- "Curvel"
+
+# format site-pair
+gdmTab <- formatsitepair(bioData=GDM_sppTab, 
+                         abundance=TRUE,
+                         bioFormat=2, #x-y spp list
+                         XColumn="longitude", 
+                         YColumn="latitude",
+                         sppColumn="species", 
+                         siteColumn="site", 
+                         abundColumn="Mean",
+                         predData=GDM_envTab)
+
+#gives error... check! maybe it doesn't like spaces in the site and spp names?? -- nope was because I didn't have lat + longs for both spp and env datasets
+```
+
+
+```{r GDM fitting, warning=FALSE, message=FALSE}
+
+#run GDM on our data
+gdm.1 <- gdm(data=gdmTab, geo=TRUE) #geo=T means we want distance btwn sites to be included as model term
+
+# check out model with summary
+summary(gdm.1)
+
+# we see low % deviance explained of ~4 (ie. goodnes-of-fit)
+
+# intercept is 0.65, which means that sites that don't differ in predictors can have this amount of dissimilarity
+
+# Summary of the fitted I-splines is reported for each predictor. The sum indicates the amount of compositional turnover associated with that variable, holding all other variables constant. I-spline summaries are order by coefficient sum. Variables with all coefficients=0 have no relationship with the modeled biological pattern
+
+## looks like SSS has no relationship to biological pattern
+
+```
+
+```{r plot GDM splines, warning=FALSE, message=FALSE}
+
+length(gdm.1$predictors) # get ideal of number of panels
+#> [1] 4
+plot(gdm.1, plot.layout=c(2,3))
+
+# displays summary plots showing (i) the fitted relationship between predicted ecological distance and observed compositional dissimilarity and (ii) predicted versus observed biological distance, followed by a series of panels showing each I-spline with at least one non-zero coefficient (plotted in order by sum of the I-spline coefficients).
+
+# The spline’s shape indicates how the rate of biological change varies with position along that gradient. Thus, the splines provide insight into the total magnitude of biological change as a function of each gradient and where along each gradient those changes are most pronounced. Here we see that the most change happens going from mid to high values of current velocity
 
 ```
 
 
 
+```{r predict into future, warning=FALSE, message=FALSE }
+
+# will need to first download future env vars
+mar.env.2050 <- load_layers( layercodes = c("BO2_RCP85_2050_tempmean_ss", "BO2_RCP85_2050_salinitymean_ss", "BO2_RCP85_2050_curvelmean_ss") , datadir = 'C:/Users/erica.nielsen/Desktop/Synz/MARINe/PCI_MARINe_synth/GDM', equalarea=FALSE, rasterstack=TRUE)
+
+#crop 
+mar.env.2050.c <- crop(mar.env.2050, WC.ext)
+
+#rename raster layers to be same as in the model
+names(mar.env.2050.c)[1] <- 'SST'
+names(mar.env.2050.c)[2] <- 'SSS'
+names(mar.env.2050.c)[3] <- 'Curvel'
+
+names(mar.env.pres.c)[1] <- 'SST'
+names(mar.env.pres.c)[2] <- 'SSS'
+names(mar.env.pres.c)[3] <- 'Curvel'
 
 
+#have to re-stack now
+mar.env.2050.c <- stack(mar.env.2050.c)
+mar.env.pres.c <- stack(mar.env.pres.c)
+
+
+# here we use the GDM model to first predict onto the present day, and then into the future -- pretty sure raster layer names must be the same!
+timePred <- predict(gdm.1, mar.env.pres.c, time=TRUE, predRasts=mar.env.2050.c) #time=T means that we predict into new timeframe
+
+# by plotting we see the expected magnitude of change in vegetation composition, which can be interpreted as a biologically-scaled metric of climate stress
+raster::plot(timePred) 
+
+```
 
